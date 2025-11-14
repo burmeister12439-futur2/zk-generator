@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ZK/RK Generator – v7.1</title>
+<meta name="description" content="Tool zur Analyse von Zielkonflikten in Transformationsprozessen - KI-gestützt">
+<style>
+  :root { --bg:#fafafa; --card:#ffffff; --muted:#6b7280; --accent:#111827; --gray:#e5e7eb; }
+  html,body{margin:0;padding:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  .wrap{max-width:1200px;margin:24px auto;padding:0 16px}
+  h1{font-size:24px;margin:0 0 8px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:768px){.grid{grid-template-columns:1fr}}
+  .card{background:#fff;border:1px solid var(--gray);border-radius:14px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04);max-height:90vh;overflow-y:auto}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  label{font-weight:600;font-size:14px;min-width:60px}
+  input[type="text"], textarea, select{flex:1;padding:10px 12px;border:1px solid var(--gray);border-radius:10px;font-size:14px;background:#fff}
+  textarea{min-height:180px;line-height:1.4;width:100%}
+  .btn{appearance:none;border:1px solid var(--gray);background:#fff;border-radius:12px;padding:10px 14px;font-weight:600;cursor:pointer;transition:all 0.2s}
+  .btn:hover{background:#f3f4f6}
+  .btn.primary{background:#111827;color:#fff;border-color:#111827}
+  .btn.primary:hover{background:#1f2937}
+  .btn-refine{padding:8px 12px;min-width:40px}
+  .title{font-weight:700;font-size:16px;margin:16px 0 8px;color:var(--accent)}
+  .result{background:#fef3c7;padding:12px;border-radius:10px;font-size:14px;margin-top:8px}
+  .labelBox{font-size:18px;font-weight:700;padding:10px;border-radius:10px;background:#f3f4f6;margin-bottom:8px}
+  .table{width:100%;border-collapse:collapse;margin:10px 0}
+  .table th{text-align:left;padding:8px 6px;font-size:13px;font-weight:700;background:#f9fafb;border-bottom:1px solid var(--gray)}
+  .table td{padding:8px 6px;font-size:13px}
+  .kpi{display:inline-block;margin:4px 8px 4px 0;font-size:13px;font-weight:400}
+  .pill{background:#e5e7eb;padding:4px 10px;border-radius:12px;font-weight:600;font-size:13px}
+  .debug{font-family:monospace;font-size:12px;background:#f3f4f6;padding:8px;border-radius:6px;margin-top:6px;color:#374151}
+  .small{font-size:12px;color:var(--muted)}
+  code{background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:12px}
+  .hl{background:#fef3c7;padding:10px;border-radius:8px;font-size:13px}
+  input[type="file"]{font-size:13px;padding:6px}
+  select{padding:8px 10px;border:1px solid var(--gray);border-radius:8px;font-size:13px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h1>ZK/RK Generator – v7.1 🤖💾</h1>
+  <div class="grid">
+    <div class="card">
+      <div class="title">1) Text & ZK setzen</div>
+      <div class="row">
+        <label>Pol A</label>
+        <input id="polA" type="text" placeholder="z. B. Klimaneutrale Stadt">
+        <button id="refineA" class="btn btn-refine" style="display:none" title="Verbessern">🔄</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <label>Pol B</label>
+        <input id="polB" type="text" placeholder="z. B. Autogerechte Lebenswelt">
+        <button id="refineB" class="btn btn-refine" style="display:none" title="Verbessern">🔄</button>
+      </div>
+      <div class="row" style="margin-top:6px"><textarea id="text" placeholder="Transformationstext einfügen. Bonus: ›A ↔ B‹ oder ›zwischen A und B‹."></textarea></div>
+      <div class="row" style="margin-top:8px"><button id="analyze" class="btn primary">Analysieren</button><button id="reset" class="btn">Zurücksetzen</button></div>
+      <div class="title" style="margin-top:18px">Fälle importieren</div>
+      <div class="row small">CSV: Spalten <code>polA,polB,kern,time,cost,protest,schere,luecke</code></div>
+      <div class="row" style="margin-top:6px"><input id="csvfile" type="file" accept=".csv,text/csv"></div>
+      <div class="row" style="margin-top:6px"><select id="caseSelect"></select><button id="loadCase" class="btn">Fall laden</button></div>
+      <div id="kernbox" class="hl" style="display:none;margin-top:8px"></div>
+    </div>
+    <div class="card">
+      <div class="title">2) Ergebnis</div>
+      <div id="label" class="labelBox">Label: –</div>
+      <div id="sentence" class="result">Ein‑Satz‑Ergebnis erscheint hier.</div>
+      <div class="title">3) Bewertung</div>
+      <table class="table">
+        <tr><th style="width:30%">ZK‑Qualität (Q)</th><td>
+          <label class="kpi"><input type="checkbox" id="q1"> Beide Pole erfüllen je eine Systemfunktion</label><br>
+          <label class="kpi"><input type="checkbox" id="q2"> Kernkollision sichtbar (↔ / „zwischen A und B" / Nähe)</label>
+        </td></tr>
+        <tr><th>Heute‑Signale (H) – je 2 Punkte</th><td>
+          <label class="kpi"><input type="checkbox" id="s_time"> Pfad/Fristen</label>
+          <label class="kpi"><input type="checkbox" id="s_cost"> Kosten-/Preissprung</label>
+          <label class="kpi"><input type="checkbox" id="s_bar"> Barrieren</label>
+          <label class="kpi"><input type="checkbox" id="s_schere"> Kleinere Einkommen relativ stärker belastet</label>
+          <label class="kpi"><input type="checkbox" id="s_luecke"> Schutzlücke</label>
+        </td></tr>
+        <tr><th>H‑Punkte</th><td><span id="hscore" class="pill">0 / 10</span></td></tr>
+      </table>
+      <div class="title">Debug</div>
+      <div id="debug" class="debug">–</div>
+      <div style="margin-top:8px;color:#6b7280;font-size:12px">Regel: ZENTRAL, wenn Q ≥ 2 & H ≥ 7 (Grenzfall → bei „Schere"). PRÜFKANDIDAT: H 3–6. Hintergrund: sonst.</div>
+      
+      <div class="title" style="margin-top:24px">📚 Gespeicherte ZKs (<span id="savedCount">0</span>)</div>
+      <div style="margin-bottom:8px">
+        <button id="saveZK" class="btn primary" style="width:100%">💾 Aktuellen ZK speichern</button>
+      </div>
+      <div id="savedZKs" style="max-height:300px;overflow-y:auto;background:#f8f9fa;border-radius:10px;padding:8px">
+        <div style="color:#6b7280;font-size:13px;text-align:center;padding:20px">Noch keine ZKs gespeichert</div>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <button id="exportZKs" class="btn" style="flex:1">📥 Als CSV</button>
+        <button id="clearZKs" class="btn" style="flex:1">🗑 Alle löschen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+
+// KI-ANALYSE
+async function aiPoleExtraction(text) {
+  $("#sentence").innerHTML = '⏳ <strong>KI-Analyse läuft...</strong><br><small style="color:#6b7280;">Dauert 2-3 Sekunden.</small>';
+  
+  const prompt = `Analysiere diesen deutschen Text und identifiziere den zentralen Zielkonflikt.
+
+TEXT:
+"""
+${text.slice(0, 2000)}
+"""
+
+Finde die zwei gegensätzlichen Pole. Pole müssen abstrakte Systemfunktionen sein, keine Akteure.
+
+Antworte NUR mit JSON (ohne Markdown):
+{
+  "polA": "Prägnante Bezeichnung",
+  "polB": "Prägnante Bezeichnung",
+  "confidence": "hoch",
+  "begründung": "1-2 Sätze"
+}`;
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 500,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+    
+    if (!response.ok) throw new Error(`API Error: ${response.status}`);
+    
+    const data = await response.json();
+    let jsonText = data.content[0].text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const result = JSON.parse(jsonText);
+    
+    return {
+      polA: cleanPole(result.polA),
+      polB: cleanPole(result.polB),
+      confidence: result.confidence || "mittel",
+      explanation: result.begründung
+    };
+  } catch (error) {
+    console.error("KI-Analyse fehlgeschlagen:", error);
+    $("#sentence").innerHTML = `❌ <strong>KI-Analyse fehlgeschlagen</strong><br><small style="color:#dc2626;">${error.message}</small>`;
+    return null;
+  }
+}
+
+function cleanPole(s){
+  return s.replace(/^(der|die|das|dem|den|ein|eine)\s+/i,'').replace(/[„""'''`]*/g,'').trim();
+}
+
+function suggestPolesFromText(text) {
+  if(!text || text.length < 20) return null;
+  
+  const withoutNoMatch = text.match(/(?:ohne|fehlt|fehlen)\s+([a-zäöüß\s]{3,35}?)\s+(?:kein|keine|keinen|nicht|keinerlei)\s+([a-zäöüß\s]{3,35}?)(?:[.,:!?\s]|$)/i);
+  if(withoutNoMatch && withoutNoMatch[1] && withoutNoMatch[2]) {
+    return {
+      polA: cleanPole(withoutNoMatch[1]),
+      polB: cleanPole(withoutNoMatch[2]),
+      confidence: "hoch",
+      method: "ohne-kein"
+    };
+  }
+  
+  const explicitPatterns = [
+    /zwischen\s+([^.!?]+?)\s+und\s+([^.!?]+?)[\s.,!?]/i,
+    /([^.!?]+?)\s+(?:vs\.|versus|gegen)\s+([^.!?]+?)[\s.,!?]/i,
+    /entweder\s+([^.!?]+?)\s+oder\s+([^.!?]+?)[\s.,!?]/i,
+    /Spannungsfeld\s+([^.!?]+?)\s+und\s+([^.!?]+?)[\s.,!?]/i
+  ];
+  
+  for(let pattern of explicitPatterns) {
+    const match = text.match(pattern);
+    if(match && match[1] && match[2]) {
+      return {
+        polA: cleanPole(match[1]),
+        polB: cleanPole(match[2]),
+        confidence: "hoch",
+        method: "explizit"
+      };
+    }
+  }
+  
+  return null;
+}
+
+function generateAlternatives(currentPole) {
+  const patterns = {
+    "Ressourceneffizienz": [
+      "Kostenorientierte Medizinethik",
+      "Rationierung im Gesundheitswesen",
+      "Ökonomische Ressourcenverteilung",
+      "Wirtschaftlichkeit der Versorgung"
+    ],
+    "Therapieanspruch": [
+      "Unbedingter Lebensschutz",
+      "Gleichbehandlungsgebot",
+      "Patientenrechte",
+      "Umfassende medizinische Versorgung"
+    ],
+    "Kostenorientiert": [
+      "Kostenorientierte Medizinethik",
+      "Ökonomisierung des Gesundheitswesens",
+      "Wirtschaftliche Effizienz",
+      "Rationelle Ressourcennutzung"
+    ],
+    "Lebensschutz": [
+      "Unbedingter Lebensschutz",
+      "Menschenwürde",
+      "Recht auf Leben",
+      "Unantastbarkeit des Lebens"
+    ],
+    "Finanzierung": [
+      "Finanzierung Innenstadtprogramme", 
+      "Bundesfinanzierung Stadtentwicklung", 
+      "Nachhaltige Förderstrukturen",
+      "Kommunale Investitionsbudgets"
+    ],
+    "Förderung": [
+      "Finanzielle Förderung", 
+      "Strukturelle Unterstützung", 
+      "Investitionsprogramme",
+      "Finanzierung Innenstadtprogramme"
+    ],
+    "Fortschritt": [
+      "Stadtentwicklung",
+      "Urbane Transformation",
+      "Innenstadtrevitalisierung",
+      "Lebendige Stadtzentren"
+    ],
+    "Innenstädte": [
+      "Lebendige Stadtzentren", 
+      "Resiliente Innenstädte", 
+      "Attraktive urbane Zentren",
+      "Demokratische Stadtzentren"
+    ],
+    "Klimaschutz": [
+      "Klimaneutralität 2045",
+      "CO2-Reduktion",
+      "Dekarbonisierung",
+      "Klimagerechte Transformation"
+    ],
+    "Wirtschaft": [
+      "Wirtschaftliche Wettbewerbsfähigkeit",
+      "Industrielle Entwicklung",
+      "Ökonomisches Wachstum",
+      "Standortsicherung"
+    ]
+  };
+  
+  const alternatives = [currentPole];
+  
+  for(let [pattern, alts] of Object.entries(patterns)) {
+    if(currentPole.toLowerCase().includes(pattern.toLowerCase())) {
+      alternatives.push(...alts);
+      break;
+    }
+  }
+  
+  if(alternatives.length === 1) {
+    alternatives.push(
+      currentPole + " (konkretisieren)",
+      "Bitte manuell anpassen"
+    );
+  }
+  
+  return [...new Set(alternatives)].slice(0, 5);
+}
+
+function showRefinementDialog(polId) {
+  const currentPole = $(`#${polId}`).value;
+  if(!currentPole) return;
+  
+  const alternatives = generateAlternatives(currentPole);
+  
+  const dialog = document.createElement("div");
+  dialog.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center";
+  
+  dialog.innerHTML = `
+    <div style="background:white;border-radius:14px;padding:24px;max-width:500px;width:90%">
+      <h3 style="margin:0 0 16px;display:flex;align-items:center;gap:8px">🔄 Alternativen für ${polId === 'polA' ? 'Pol A' : 'Pol B'}</h3>
+      ${alternatives.map((alt, i) => `
+        <label style="display:block;padding:12px;margin:8px 0;border:2px solid ${i===0?'#3b82f6':'#e5e7eb'};border-radius:10px;cursor:pointer">
+          <input type="radio" name="refine" value="${alt}" ${i===0?'checked':''} style="margin-right:8px">
+          ${alt}
+        </label>
+      `).join('')}
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button id="applyRef" class="btn primary" style="flex:1">✓ Übernehmen</button>
+        <button id="cancelRef" class="btn" style="flex:1">Abbrechen</button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(dialog);
+  
+  $("#applyRef").addEventListener("click", () => {
+    const selected = document.querySelector('input[name="refine"]:checked');
+    if(selected) {
+      $(`#${polId}`).value = selected.value;
+      $(`#${polId}`).style.background = "#e0f2fe";
+    }
+    dialog.remove();
+    
+    if($("#polA").value && $("#polB").value && $("#text").value) {
+      $("#analyze").click();
+    }
+  });
+  
+  $("#cancelRef").addEventListener("click", () => dialog.remove());
+  dialog.addEventListener("click", e => { if(e.target === dialog) dialog.remove(); });
+}
+
+let autoSuggestedPoles = false;
+
+$("#analyze").addEventListener("click", async ()=>{
+  console.log("Analyze clicked");
+  const a = $("#polA").value.trim(), b=$("#polB").value.trim(), t=$("#text").value.trim();
+  
+  const isPlaceholder = (val) => !val || val.toLowerCase().includes("z. b.");
+  
+  if(isPlaceholder(a) || isPlaceholder(b) || !a || !b) {
+    if(!autoSuggestedPoles && t.length > 20) {
+      const suggested = suggestPolesFromText(t);
+      
+      const isLowQuality = suggested && (
+        suggested.confidence === "niedrig" ||
+        suggested.polA.length < 5 ||
+        suggested.polA.toLowerCase().includes("wenn") ||
+        suggested.polB.toLowerCase().includes("macht")
+      );
+      
+      if(suggested && !isLowQuality) {
+        $("#polA").value = suggested.polA;
+        $("#polB").value = suggested.polB;
+        autoSuggestedPoles = true;
+        
+        const emoji = {"hoch": "✅", "mittel": "⚠️", "niedrig": "💡"};
+        
+        $("#sentence").innerHTML = `
+          ${emoji[suggested.confidence]} <strong>Auto-Vorschlag (${suggested.confidence}e Konfidenz - Pattern)</strong><br>
+          Pol A: <em>${suggested.polA}</em><br>
+          Pol B: <em>${suggested.polB}</em><br><br>
+          <small style="color:#6b7280;">💡 Nutze die 🔄-Buttons oder klicke erneut "Analysieren"</small>
+        `;
+        $("#polA").style.background = "#fffbeb";
+        $("#polB").style.background = "#fffbeb";
+        $("#refineA").style.display = "inline-block";
+        $("#refineB").style.display = "inline-block";
+        return;
+      }
+      
+      $("#sentence").innerHTML = `
+        ⚠️ <strong>Kein klares Muster erkannt</strong><br><br>
+        <button id="triggerAI" class="btn primary" style="padding:10px 20px">🤖 KI-Analyse starten (2-3s)</button>
+        <button id="manualInput" class="btn" style="padding:10px 20px;margin-left:8px">✋ Manuell</button>
+      `;
+      
+      $("#triggerAI").addEventListener("click", async () => {
+        const aiResult = await aiPoleExtraction(t);
+        if(aiResult) {
+          $("#polA").value = aiResult.polA;
+          $("#polB").value = aiResult.polB;
+          autoSuggestedPoles = true;
+          
+          $("#sentence").innerHTML = `
+            🤖 <strong>KI-Analyse abgeschlossen (${aiResult.confidence}e Konfidenz)</strong><br>
+            Pol A: <em>${aiResult.polA}</em><br>
+            Pol B: <em>${aiResult.polB}</em><br><br>
+            <div style="background:#f0f9ff;border-left:3px solid #0284c7;padding:10px;margin:10px 0;border-radius:5px">
+              <strong style="color:#0369a1">💡 Begründung:</strong><br>
+              <small style="color:#075985">${aiResult.explanation}</small>
+            </div>
+            <small style="color:#6b7280;">Nutze die 🔄-Buttons oder klicke erneut "Analysieren"</small>
+          `;
+          $("#polA").style.background = "#dbeafe";
+          $("#polB").style.background = "#dbeafe";
+          $("#refineA").style.display = "inline-block";
+          $("#refineB").style.display = "inline-block";
+        }
+      });
+      
+      $("#manualInput").addEventListener("click", () => {
+        $("#sentence").textContent = "✋ Bitte definiere die Pole manuell.";
+      });
+      
+      return;
+    }
+    
+    $("#sentence").textContent = "⚠️ Bitte Pol A und Pol B setzen oder Text einfügen.";
+    return;
+  }
+  
+  autoSuggestedPoles = false;
+  $("#polA").style.background = "#fff";
+  $("#polB").style.background = "#fff";
+  
+  const qScore = [$("#q1").checked, $("#q2").checked].filter(Boolean).length;
+  const hScore = 2 * [$("#s_time").checked, $("#s_cost").checked, $("#s_bar").checked, $("#s_schere").checked, $("#s_luecke").checked].filter(Boolean).length;
+  
+  let label = "HINTERGRUND";
+  if(qScore >= 2 && hScore >= 7) label = "ZENTRAL";
+  else if(hScore >= 3 && hScore <= 6) label = "PRÜFKANDIDAT";
+  
+  $("#label").textContent = `Label: ${label}`;
+  $("#label").style.background = label==="ZENTRAL" ? "#dcfce7" : label==="PRÜFKANDIDAT" ? "#fef3c7" : "#f3f4f6";
+  $("#hscore").textContent = `${hScore} / 10`;
+  
+  $("#sentence").innerHTML = `<strong>${a} ↔ ${b}</strong> ist als <strong>${label}</strong> eingestuft (Q=${qScore}, H=${hScore}).`;
+  
+  $("#debug").textContent = `Q=${qScore}, H=${hScore} → ${label}`;
+});
+
+$("#reset").addEventListener("click", () => {
+  $("#polA").value = "";
+  $("#polB").value = "";
+  $("#text").value = "";
+  ["q1","q2","s_time","s_cost","s_bar","s_schere","s_luecke"].forEach(id => $(`#${id}`).checked = false);
+  $("#label").textContent = "Label: –";
+  $("#label").style.background = "#f3f4f6";
+  $("#sentence").textContent = "Ein‑Satz‑Ergebnis erscheint hier.";
+  $("#debug").textContent = "–";
+  $("#hscore").textContent = "0 / 10";
+  $("#refineA").style.display = "none";
+  $("#refineB").style.display = "none";
+  autoSuggestedPoles = false;
+});
+
+$("#refineA").addEventListener("click", (e) => { e.preventDefault(); showRefinementDialog('polA'); });
+$("#refineB").addEventListener("click", (e) => { e.preventDefault(); showRefinementDialog('polB'); });
+
+// ZK STORAGE
+let savedZKs = JSON.parse(localStorage.getItem('zkStorage') || '[]');
+
+function updateSavedZKsUI() {
+  const container = $("#savedZKs");
+  $("#savedCount").textContent = savedZKs.length;
+  
+  if(savedZKs.length === 0) {
+    container.innerHTML = '<div style="color:#6b7280;font-size:13px;text-align:center;padding:20px">Noch keine ZKs gespeichert</div>';
+    return;
+  }
+  
+  container.innerHTML = savedZKs.map((zk, idx) => `
+    <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:8px">
+      <div style="font-weight:600;font-size:14px;margin-bottom:4px">${idx + 1}. ${zk.polA} ↔ ${zk.polB}</div>
+      <div style="font-size:12px;color:#6b7280;margin-bottom:8px">
+        <span style="background:${zk.label === 'ZENTRAL' ? '#dcfce7' : zk.label === 'PRÜFKANDIDAT' ? '#fef3c7' : '#f3f4f6'};padding:2px 6px;border-radius:4px;font-weight:600">${zk.label}</span>
+        <span style="margin-left:8px">H: ${zk.hScore}/10</span>
+        <span style="margin-left:8px">${zk.timestamp}</span>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button onclick="loadZK(${idx})" class="btn" style="flex:1;padding:6px 10px;font-size:12px">📂 Laden</button>
+        <button onclick="deleteZK(${idx})" class="btn" style="flex:1;padding:6px 10px;font-size:12px">🗑 Löschen</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+window.loadZK = function(idx) {
+  const zk = savedZKs[idx];
+  $("#polA").value = zk.polA;
+  $("#polB").value = zk.polB;
+  $("#text").value = zk.text;
+  $("#q1").checked = zk.q1;
+  $("#q2").checked = zk.q2;
+  $("#s_time").checked = zk.signals.time;
+  $("#s_cost").checked = zk.signals.cost;
+  $("#s_bar").checked = zk.signals.bar;
+  $("#s_schere").checked = zk.signals.schere;
+  $("#s_luecke").checked = zk.signals.luecke;
+  $("#analyze").click();
+  alert(`✅ ZK #${idx + 1} geladen!`);
+};
+
+window.deleteZK = function(idx) {
+  if(confirm(`ZK #${idx + 1} wirklich löschen?`)) {
+    savedZKs.splice(idx, 1);
+    localStorage.setItem('zkStorage', JSON.stringify(savedZKs));
+    updateSavedZKsUI();
+  }
+};
+
+$("#saveZK").addEventListener("click", () => {
+  const polA = $("#polA").value.trim();
+  const polB = $("#polB").value.trim();
+  const text = $("#text").value.trim();
+  
+  if(!polA || !polB) {
+    alert("⚠️ Bitte erst einen ZK analysieren!");
+    return;
+  }
+  
+  const zk = {
+    polA: polA,
+    polB: polB,
+    text: text,
+    label: $("#label").textContent.replace("Label: ", ""),
+    q1: $("#q1").checked,
+    q2: $("#q2").checked,
+    signals: {
+      time: $("#s_time").checked,
+      cost: $("#s_cost").checked,
+      bar: $("#s_bar").checked,
+      schere: $("#s_schere").checked,
+      luecke: $("#s_luecke").checked
+    },
+    hScore: parseInt($("#hscore").textContent.split('/')[0]),
+    timestamp: new Date().toLocaleString('de-DE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})
+  };
+  
+  savedZKs.push(zk);
+  localStorage.setItem('zkStorage', JSON.stringify(savedZKs));
+  updateSavedZKsUI();
+  alert(`✅ ZK gespeichert! (${savedZKs.length} gesamt)`);
+});
+
+$("#exportZKs").addEventListener("click", () => {
+  if(savedZKs.length === 0) {
+    alert("⚠️ Keine ZKs zum Exportieren!");
+    return;
+  }
+  
+  const csv = [
+    "Nr,Pol A,Pol B,Label,Q1,Q2,Zeit,Kosten,Barrieren,Schere,Lücke,H-Score,Timestamp",
+    ...savedZKs.map((zk, idx) => [
+      idx + 1,
+      `"${zk.polA}"`,
+      `"${zk.polB}"`,
+      zk.label,
+      zk.q1 ? 'ja' : 'nein',
+      zk.q2 ? 'ja' : 'nein',
+      zk.signals.time ? 'ja' : 'nein',
+      zk.signals.cost ? 'ja' : 'nein',
+      zk.signals.bar ? 'ja' : 'nein',
+      zk.signals.schere ? 'ja' : 'nein',
+      zk.signals.luecke ? 'ja' : 'nein',
+      zk.hScore,
+      zk.timestamp
+    ].join(','))
+  ].join('\n');
+  
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `ZK_Export_${new Date().toISOString().slice(0,10)}.csv`;
+  link.click();
+});
+
+$("#clearZKs").addEventListener("click", () => {
+  if(confirm(`Wirklich ALLE ${savedZKs.length} ZKs löschen?`)) {
+    savedZKs = [];
+    localStorage.setItem('zkStorage', JSON.stringify(savedZKs));
+    updateSavedZKsUI();
+    alert("✅ Alle ZKs gelöscht!");
+  }
+});
+
+updateSavedZKsUI();
+console.log("ZK Generator v7.1 ready");
+</script>
+
+</body>
+</html>
