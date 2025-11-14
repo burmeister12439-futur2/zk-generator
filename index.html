@@ -108,7 +108,7 @@ const $=s=>document.querySelector(s);
 async function aiPoleExtraction(text) {
   $("#sentence").innerHTML = '⏳ <strong>KI-Analyse läuft...</strong><br><small style="color:#6b7280;">Dauert 2-3 Sekunden.</small>';
   
-  const BACKEND_URL = "https://zk-generator-backend.onrender.com";
+const BACKEND_URL = "https://zk-generator-backend-production.up.railway.app";
   
   try {
     const response = await fetch(`${BACKEND_URL}/analyze`, {
